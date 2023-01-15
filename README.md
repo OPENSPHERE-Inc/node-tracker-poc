@@ -6,7 +6,7 @@
 そこで、この小規模なライブラリ「Node Tracker for Symbol」を使うことで、アプリが全ノードをトラッキングし最適なものを自動的に選択できるようになります。
 その為ユーザーはノードURLをいちいち設定する必要が無くなります。
 
-Node Tracker for Symbol ではノード一覧を収集する為に [Symbol Statistics Service](https://github.com/symbol/statistics-service)
+Node Tracker for Symbol ではノードリストを収集する為に [Symbol Statistics Service](https://github.com/symbol/statistics-service)
 （メインネットの場合 `https://symbol.services/nodes` 、テストネットの場合 `https://testnet.symbol.services/nodes`) を使用する想定です。
 
 取得した全ノードに対して「ヘルスチェック」を実行し、アクセスできないものを除外し、かつレイテンシーが低い順でソートを行います。
@@ -64,6 +64,17 @@ node dist/samples/userPick.js
 ## 3. ライブラリ
 
 ### 3.1. [NodeTrackerService](./src/services/node_tracker.ts) クラス
+
+**サンプルコード**
+
+```typescript
+const nodeTracker = new NodeTrackerService("https://testnet.symbol.services/nodes", 152);
+await nodeTracker.discovery();
+await nodeTracker.pingAll();
+
+// 低レイテンシートップ10 以内かつ 1000 msec 以下のレイテンシーの物からピック
+const node = nodeTracker.pickOne(10, 1000);
+```
 
 #### _コンストラクタ_
 

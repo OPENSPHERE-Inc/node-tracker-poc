@@ -49,7 +49,7 @@ NETWORK_TYPE=104
 node dist/samples/randomPick.js
 ```
 
-`randomPick` サンプルでは、低レイテンシー上位5件から一つランダムピックして転送トランザクションを実行します。
+`randomPick` サンプルでは、低レイテンシー上位10個から一つノードをランダムピックして転送トランザクションを実行します。
 送信元のプライベートキーと送信先のアドレス、転送量（XYM）をそれぞれ聞かれるので入力してください。
 
 **・任意選択サンプル**
@@ -58,7 +58,8 @@ node dist/samples/randomPick.js
 node dist/samples/userPick.js
 ```
 
-`userPick` サンプルでは、ユーザーが一覧から選択して転送トランザクションを実行します。
+`userPick` サンプルでは、ユーザーがノードリストから選択して転送トランザクションを実行します。
+ノードリストは低レイテンシー上位10個になります。
 ランダムピックと同様に送信元プライベートキー、送信先アドレス、転送量（XYM）の入力を求められます。
 
 ## 3. ライブラリ
@@ -72,8 +73,16 @@ const nodeTracker = new NodeTrackerService("https://testnet.symbol.services/node
 await nodeTracker.discovery();
 await nodeTracker.pingAll();
 
-// 低レイテンシートップ10 以内かつ 1000 msec 以下のレイテンシーの物からピック
-const node = nodeTracker.pickOne(10, 1000);
+// 低レイテンシートップ 10 以内かつレイテンシー 1000 msec 以下の物からピック
+let node = nodeTracker.pickOne(10, 1000);
+
+// ピック済みノードのヘルスチェックを行い、不良であれば新しいノードをピック
+if (!await nodeTracker.checkHealth(node.apiStatus.restGatewayUrl)) {
+   node = await nodeTracker.pickOne(10, 1000); 
+}
+
+// 健康なノードを 5 個ピック
+const healthyNodes = nodeTracker.pickMulti(5, 10, 1000);
 ```
 
 #### _コンストラクタ_

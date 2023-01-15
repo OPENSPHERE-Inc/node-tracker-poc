@@ -1,0 +1,7 @@
+.idea 
+.env
+.*.env
+node_modules
+dist
+undead.json
+yarn-error.log

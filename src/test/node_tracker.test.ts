@@ -15,7 +15,11 @@ describe("NodeTrackerService", () => {
 
         assert(process.env.STATS_SERVICE_URL);
         assert(process.env.NETWORK_TYPE);
-        nodeTracker = new NodeTrackerService(process.env.STATS_SERVICE_URL, Number(process.env.NETWORK_TYPE));
+        nodeTracker = new NodeTrackerService(
+            process.env.STATS_SERVICE_URL,
+            Number(process.env.NETWORK_TYPE),
+            { maxParallels: 5 }
+        );
 
         assert(process.env.ACCOUNT1_PRIVATE_KEY);
         assert(process.env.ACCOUNT2_PRIVATE_KEY);

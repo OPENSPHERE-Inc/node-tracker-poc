@@ -62,9 +62,13 @@ node dist/samples/userPick.js
 ノードリストは低レイテンシー上位10個になります。
 ランダムピックと同様に送信元プライベートキー、送信先アドレス、転送量（XYM）の入力を求められます。
 
-## 3. ライブラリ
+## 3. ブラウザ向けサンプル
 
-### 3.1. [NodeTrackerService](./src/services/node_tracker.ts) クラス
+[こちら](./browser-sample) にサンプルを用意しました。
+
+## 4. ライブラリリファレンス (TypeScript/JavaScript)
+
+### 4.1. [NodeTrackerService](./src/services/node_tracker.ts) クラス
 
 **サンプルコード**
 
@@ -77,7 +81,7 @@ await nodeTracker.pingAll();
 let node = nodeTracker.pickOne(10, 1000);
 
 // ピック済みノードのヘルスチェックを行い、不良であれば新しいノードをピック
-if (!await nodeTracker.checkHealth(node.apiStatus.restGatewayUrl)) {
+while (!await nodeTracker.checkHealth(node.apiStatus.restGatewayUrl)) {
    node = await nodeTracker.pickOne(10, 1000); 
 }
 
@@ -101,6 +105,11 @@ const nodeTracker = new NodeTrackerService(statsServiceURL, networkType, options
 - `networkType: NetworkType` - Testnet: `152`, Mainnet: `104`
 - `option: NodeTrackerServiceOptions`
   - `cachedNodes: NodeStatistics[]` - `availableNodes` をローカルキャッシュしていた場合はここで渡す
+  - `noWebSocketChallenge: boolean` - WebSocket 接続のチェックを行わない（その分高速）。デフォルトは `false`
+  - `webSocketTimeout: number` - WebSocket 接続のタイムアウト時間をミリ秒で指定。デフォルトは `60` 秒
+  - `maxParallels: number` - ヘルスチェックの同時実行数。デフォルトは `10`。
+    値を大きくするとヘルスチェックがスピードアップしますが、やりすぎると接続エラーが頻発する場合があります。
+    試した限りだと `50` 位が限度かもしれません。
 
 #### _discovery メソッド_
 
@@ -226,7 +235,7 @@ subscription.unsubscribe();
 ヘルスチェックが完了した `NodeStatistics` がリアルタイムにプッシュされます。
 リスト UI の更新トリガーなどに使用可能です。
 
-### 3.2. [NodeStatistics](./src/services/node_tracker.ts) インターフェース
+### 4.2. [NodeStatistics](./src/services/node_tracker.ts) インターフェース
 
 ```typescript
 interface NodeStatistics {
@@ -290,7 +299,7 @@ interface NodeStatistics {
 - `latest_error: string | undefined` - ヘルス不良のノードはエラーメッセージが格納されます。良好であれば `undefined` になります。
 - `latency: number | undefined` - ヘルスが良好な場合、レイテンシーの値（ミリ秒）が格納されます。
 
-## 4. 本ライブラリの今後について
+## 5. 本ライブラリの今後について
 
 本ライブラリは他プロジェクトで使用する為、
 近日中に [@opensphere-inc/symbol-service](https://www.npmjs.com/package/@opensphere-inc/symbol-service) へ統合される予定です。

@@ -13,6 +13,6 @@
     "declarationMap": true,
     "resolveJsonModule": true
   },
-  "exclude": [ "symbol-service" ],
+  "exclude": [ "browser-sample" ],
   "compileOnSave": true
 }

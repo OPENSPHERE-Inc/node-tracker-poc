@@ -204,12 +204,12 @@ export class NodeTrackerService {
         top: number = this._availableNodes.length,
         maxLatency: number = Number.MAX_SAFE_INTEGER
     ) {
-        const nodeTable = this.createNodeTable(maxLatency);
+        const nodeTable = this.createNodeTable(maxLatency).slice(0, top);
         const result = new Array<NodeStatistics>();
 
         for (let i = 0 ; i < count && nodeTable.length; i++) {
             const node = nodeTable.splice(
-                Math.floor(Math.min(top, nodeTable.length) * Math.random()),
+                Math.floor(nodeTable.length * Math.random()),
                 1
             ).shift();
             assert(node);

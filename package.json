@@ -54,6 +54,6 @@
   "scripts": {
     "clean": "rimraf dist",
     "test": "jest",
-    "build": "yarn clean && tsc"
+    "build": "yarn clean && tsc && yarn pack --filename node-tracker-poc.tgz"
   }
 }

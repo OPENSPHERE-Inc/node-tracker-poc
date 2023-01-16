@@ -1,0 +1,51 @@
+.content {
+  word-break: break-word;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.scrollbar {
+  &.scrollbar-y {
+    overflow-y: scroll;
+  }
+  &.scrollbar-x {
+    overflow-y: scroll;
+  }
+
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: rgba(52, 73, 94, 0.5);
+  }
+}
+
+.modal {
+  .modal-card {
+    .modal-card-body {
+      @extend .scrollbar;
+      @extend .scrollbar-y;
+      max-height: 70vh;
+    }
+  }
+}
+
+@include touch() {
+  table {
+    font-size: 0.8em;
+
+    tbody {
+      th {
+        white-space: break-spaces;
+        min-width: 8em;
+      }
+    }
+  }
+}

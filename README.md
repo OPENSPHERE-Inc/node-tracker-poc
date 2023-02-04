@@ -229,10 +229,17 @@ Symbol Statistics Service から取得したノードリストにアクセス出
 #### _pingObserver プロパティ (Readonly)_
 
 ```typescript
-const observer: Subject<NodeStatistics> = nodeTracker.pingObserver;
+const observer: Subject<{ node: NodeStatistics, index: number, total: number }> = nodeTracker.pingObserver;
 ```
 
 ヘルスチェックの進捗を購読できる `Subject` (rxjs) です。
+
+**コールバックの引数**
+
+- `{ node: NodeStatistics, index: number, total: number }`
+  - `node: NodeStatistics` - ヘルスチェックが完了、または失敗したノード
+  - `index: number` - 進捗インデックス（`availableNodes` のインデックス**ではありません**）
+  - `total: number` - `availableNodes.length` が入ります。
 
 **使用例**
 

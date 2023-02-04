@@ -142,6 +142,21 @@ const availableNodes: NodeStatistics[] = await nodeTracker.pingAll();
 
 - `NodeStatistics[]` - ノードリスト
 
+#### _abortPinging メソッド_
+
+```typescript
+nodeTracker.abortPinging();
+```
+
+`pingAll` の実行を中止します。
+実行して程なく `pingAll` メソッドが途中終了して戻ります（その際、WebSocket が全てクローズされるのを待ちます）
+
+既に開始しているノードは WebSocket は強制的にクローズされ、中止させられます。
+この時、`NodeStatsitics` の `latency` プロパティは `undefined` になり、
+`last_error` プロパティには `WebSocket connection interrupted.` エラーが格納されます。
+
+未だ開始していないノードは、それ以上実行されず `latency` も `last_error` もどちらも変化なしです。
+
 #### _pickOne メソッド_
 
 ```typescript
@@ -234,6 +249,24 @@ subscription.unsubscribe();
 
 ヘルスチェックが完了した `NodeStatistics` がリアルタイムにプッシュされます。
 リスト UI の更新トリガーなどに使用可能です。
+
+#### _isAborting プロパティ (Readonly)_
+
+```typescript
+const abortingCondition: boolean = nodeTracker.isAborting;
+```
+
+初期値は `false` で、`abortPinging` が呼ばれると `true` になります。
+`pingAll` が呼ばれると `false` となります。
+
+#### _numActiveWebSockets プロパティ（Readonly)_
+
+```typescript
+const count: number = nodeTracker.numActiveWebSockets;
+```
+
+今現在アクティブな WebSocket の数を返します。
+`pingAll` メソッドが終了した後は `0` になります。
 
 ### 4.2. [NodeStatistics](./src/services/node_tracker.ts) インターフェース
 

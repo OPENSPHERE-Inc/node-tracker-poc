@@ -4,6 +4,8 @@ import {LoadingBlock} from "../Loading";
 import createPersistedState from "use-persisted-state";
 
 
+type LoadingState = "loading" | "pinging" | "aborting" | "completed";
+
 const statsServiceUrl = process.env.REACT_APP_STATS_SERVICE_URL || "https://testnet.symbol.services/nodes";
 const networkType = Number(process.env.REACT_APP_NETWORK_TYPE || "152");
 
@@ -18,9 +20,10 @@ export interface NodeTrackerDialogProps {
     onCancel?: () => any,
 }
 
-const AvailableNodeList = ({ availableNodes, onSelect }: {
+const AvailableNodeList = ({ availableNodes, onSelect, loadingState }: {
     availableNodes: NodeStatistics[],
-    onSelect?: (node: NodeStatistics) => any
+    onSelect?: (node: NodeStatistics) => any,
+    loadingState: LoadingState,
 }) => {
     const nodeList = useMemo(
         () => availableNodes.sort((n1, n2) =>
@@ -38,7 +41,11 @@ const AvailableNodeList = ({ availableNodes, onSelect }: {
                         </a>
                     </td>
                     { !node.latest_error
-                        ? node.latency ? <td className="nowrap">{ node.latency }ms</td> : <td><LoadingBlock /></td>
+                        ? node.latency !== undefined
+                            ? <td className="nowrap">{ node.latency }ms</td>
+                            : loadingState === "completed"
+                                ? <td>N/A</td>
+                                : <td><LoadingBlock /></td>
                         : <td className="nowrap"><span className="has-text-danger" title={node.latest_error}>Error!</span></td>
                     }
                 </tr>) }
@@ -50,7 +57,7 @@ const AvailableNodeList = ({ availableNodes, onSelect }: {
 export const NodeTrackerDialog = (props: NodeTrackerDialogProps) => {
     const [ localState, setLocalState ] = useNodeTrackerLocalState();
     const [ availableNodes, setAvailableNodes ] = useState<NodeStatistics[]>([]);
-    const [ loadingState, setLoadingState ] = useState<string>("loading");
+    const [ loadingState, setLoadingState ] = useState<LoadingState>("loading");
     const nodeTrackerServiceRef = useRef<NodeTrackerService>(
         new NodeTrackerService(
             statsServiceUrl,
@@ -99,6 +106,11 @@ export const NodeTrackerDialog = (props: NodeTrackerDialogProps) => {
         }
     }, []);
 
+    const stop = useCallback( async () => {
+        nodeTrackerServiceRef.current.abortPinging();
+        setLoadingState("aborting");
+    }, []);
+
     return <div className="component-node-selector-dialog modal is-active">
         <div className="modal-background"></div>
         <div className="modal-card">
@@ -115,19 +127,34 @@ export const NodeTrackerDialog = (props: NodeTrackerDialogProps) => {
             <section className="modal-card-body">
                 { loadingState !== "loading"
                     ? availableNodes.length
-                        ? <AvailableNodeList availableNodes={availableNodes} onSelect={props.onSelect} />
+                        ? <AvailableNodeList
+                            availableNodes={availableNodes}
+                            onSelect={props.onSelect}
+                            loadingState={loadingState}
+                        />
                         : <div>No nodes found.</div>
                     : <LoadingBlock label="Now loading..." />
                 }
             </section>
             <footer className="modal-card-foot">
-                <button type="button"
-                        className={`button is-link ${loadingState !== "completed" ? "is-loading" : ""}`}
-                        onClick={reload}
-                        disabled={loadingState !== "completed"}
-                >
-                    Reload
-                </button>
+                { loadingState === "completed"
+                    ? <button type="button"
+                              className="button is-link"
+                              onClick={reload}
+                    >
+                        Reload
+                    </button>
+                    : <button type="button"
+                              className="button is-warning"
+                              onClick={stop}
+                              disabled={loadingState === "aborting"}
+                    >
+                        <span className="icon">
+                            <img src="/loading.svg" alt="Loading..." />
+                        </span>
+                        <span>Stop</span>
+                    </button>
+                }
                 <button type="button"
                         className="button"
                         onClick={props.onCancel}

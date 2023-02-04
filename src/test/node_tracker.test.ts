@@ -37,12 +37,12 @@ describe("NodeTrackerService", () => {
 
     it("Ping all nodes", async () => {
         const mock = jest.fn();
-        const subscription = await nodeTracker.pingObserver.subscribe((node) => {
+        const subscription = await nodeTracker.pingObserver.subscribe(({node, index, total}) => {
             mock();
             if (node.latency) {
-                console.debug(`${node.apiStatus.restGatewayUrl} [${node.latency} msecs]`);
+                console.debug(`${index + 1} of ${total}: ${node.apiStatus.restGatewayUrl} [${node.latency} msecs]`);
             } else {
-                console.debug(`${node.apiStatus.restGatewayUrl} [${node.latest_error}]`);
+                console.debug(`${index + 1} of ${total}: ${node.apiStatus.restGatewayUrl} [${node.latest_error}]`);
             }
         });
         await nodeTracker.pingAll();
@@ -114,5 +114,22 @@ describe("NodeTrackerService", () => {
             expect(node.latency).toBeLessThanOrEqual(1500);
             console.debug(`${node.apiStatus.restGatewayUrl} [${node.latency} msecs]`);
         });
+    }, 60000);
+
+    it("Abort pinging", async () => {
+        const subscription = await nodeTracker.pingObserver.subscribe(({node, index, total}) => {
+            if (node.latency) {
+                console.debug(`${index + 1} of ${total}: ${node.apiStatus.restGatewayUrl} [${node.latency} msecs]`);
+            } else {
+                console.debug(`${index + 1} of ${total}: ${node.apiStatus.restGatewayUrl} [${node.latest_error}]`);
+            }
+        });
+        await new Promise((resolve) => {
+            nodeTracker.pingAll().then(resolve);
+            setTimeout(() => nodeTracker.abortPinging(), 1000);
+        }).finally(() => subscription.unsubscribe());
+
+        expect(nodeTracker.isAborting).toBeTruthy();
+        expect(nodeTracker.numActiveWebSockets).toBe(0);
     }, 60000);
 });

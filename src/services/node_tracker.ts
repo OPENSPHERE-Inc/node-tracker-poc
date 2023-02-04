@@ -1,9 +1,10 @@
 import axios from "axios";
 import {firstValueFrom, Subject} from "rxjs";
 import {NetworkType, RepositoryFactoryHttp} from "symbol-sdk";
-import moment = require("moment");
 import assert from "assert";
 import WebSocket from "isomorphic-ws";
+import moment from "moment";
+import { v4 as uuidv4 } from "uuid";
 
 
 export interface NodeStatistics {
@@ -59,10 +60,12 @@ export interface NodeTrackerServiceOptions {
 export class NodeTrackerService {
 
     private _availableNodes: NodeStatistics[];
-    private readonly _pingObserver = new Subject<NodeStatistics>();
+    private readonly _pingObserver = new Subject<{ node: NodeStatistics, index: number, total: number }>();
     private readonly _noWebSocketChallenge: boolean;
     private readonly _webSocketTimeout: number;
     private readonly _maxParallels: number;
+    private _aborting = false;
+    private _webSockets = new Map<string, WebSocket>();
 
     public constructor(
         private statsServiceURL: string,
@@ -86,6 +89,14 @@ export class NodeTrackerService {
         return this._pingObserver;
     }
 
+    public get isAborting() {
+        return this._aborting;
+    }
+
+    public get numActiveWebSockets() {
+        return this._webSockets.size;
+    }
+
     private async challengeWebSocket(url: string) {
         const websocket = new WebSocket(url);
 
@@ -93,6 +104,8 @@ export class NodeTrackerService {
             websocket.close();
         }, this._webSocketTimeout);
 
+        const id = uuidv4();
+        this._webSockets.set(id, websocket);
         return (new Promise<boolean>(async (resolve) => {
             let result = false;
             websocket.addEventListener("message",() => {
@@ -103,7 +116,10 @@ export class NodeTrackerService {
             websocket.addEventListener("close", () => {
                 resolve(result);
             });
-        })).finally(() => clearTimeout(timeout));
+        })).finally(() => {
+            clearTimeout(timeout)
+            this._webSockets.delete(id);
+        });
     }
 
     private async ping(node: NodeStatistics) {
@@ -126,7 +142,7 @@ export class NodeTrackerService {
             // Try to open WebSocket connection
             if (!this._noWebSocketChallenge && !await this.challengeWebSocket(node.apiStatus.webSocket.url)) {
                 node.latency = undefined;
-                node.latest_error = "WebSocket connection timeout.";
+                node.latest_error = "WebSocket connection interrupted.";
             } else {
                 node.latency = latency;
                 node.latest_error = undefined;
@@ -136,7 +152,7 @@ export class NodeTrackerService {
             node.latest_error = String(e);
         }
 
-        this._pingObserver.next(node);
+        return node;
     }
 
     public async discovery() {
@@ -172,12 +188,18 @@ export class NodeTrackerService {
     public async pingAll() {
         const nodes = [ ...this._availableNodes ];
         const nextNode = () => nodes.splice(0, 1).shift();
+        this._aborting = false;
 
         const workers = new Array<Promise<void>>();
+        let index = 0;
         for (let i = 0; i < this._maxParallels; i++) {
             workers.push(new Promise(async (resolve) => {
                 for (let node = nextNode(); node; node = nextNode()) {
+                    if (this._aborting) {
+                        return resolve();
+                    }
                     await this.ping(node);
+                    this._pingObserver.next({ node, index: index++, total: this._availableNodes.length });
                 }
                 resolve();
             }));
@@ -185,6 +207,14 @@ export class NodeTrackerService {
         await Promise.allSettled(workers);
 
         return this._availableNodes;
+    }
+
+    public abortPinging() {
+        this._aborting = true;
+        // Close all available websockets
+        for (const socket of this._webSockets.values()) {
+            socket.close();
+        }
     }
 
     private createNodeTable(maxLatency: number = Number.MAX_SAFE_INTEGER) {
@@ -224,4 +254,5 @@ export class NodeTrackerService {
         node && await this.ping(node);
         return node?.latency !== undefined && !node.latest_error ? node : undefined;
     }
+
 }

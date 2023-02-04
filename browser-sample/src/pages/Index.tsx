@@ -22,7 +22,7 @@ const Index = () => {
                         setSelectedNode(node);
                         setNodeSelectorDialogShow(false);
                     } else {
-                        alert(`Couldn't select this node with error\n${node.latest_error}`)
+                        alert(`Couldn't select this node with error\n${node.latest_error}`);
                     }
                 }}
                 onCancel={() => setNodeSelectorDialogShow(false)}

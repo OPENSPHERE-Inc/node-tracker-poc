@@ -234,11 +234,11 @@ const observer: Subject<NodeStatistics> = nodeTracker.pingObserver;
 **使用例**
 
 ```typescript
-const subscription = observer.subscribe((node: NodeStatistics) => {
+const subscription = observer.subscribe(({node, index, total}: {node: NodeStatistics, index: number, total: number }) => {
     if (node.latest_error) {
-        console.debug(`${node.apiStatus.restGatewayUrl} [${node.latest_error}]`);
+        console.debug(`${index + 1} of ${total}: ${node.apiStatus.restGatewayUrl} [${node.latest_error}]`);
     } else {
-        console.debug(`${node.apiStatus.restGatewayUrl} [${node.latency} msecs]`);
+        console.debug(`${index + 1} of ${total}: ${node.apiStatus.restGatewayUrl} [${node.latency} msecs]`);
     }
 });
 
@@ -247,7 +247,9 @@ const subscription = observer.subscribe((node: NodeStatistics) => {
 subscription.unsubscribe();
 ```
 
-ヘルスチェックが完了した `NodeStatistics` がリアルタイムにプッシュされます。
+ヘルスチェックが完了またはエラー終了した `NodeStatistics` がリアルタイムにプッシュされます。
+エラー終了した場合は `node.latest_error` にエラーが入ります。
+
 リスト UI の更新トリガーなどに使用可能です。
 
 #### _isAborting プロパティ (Readonly)_

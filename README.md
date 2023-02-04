@@ -94,6 +94,9 @@ const healthyNodes = nodeTracker.pickMulti(5, 10, 1000);
 ```typescript
 const options: NodeTrackerServiceOptions = {
     cachedNodes: [] as NodeStatistics,
+    noWebSocketChallenge: false,
+    webSocketTimeout: 60000,
+    maxParallels: 10,
 };
 
 const nodeTracker = new NodeTrackerService(statsServiceURL, networkType, options);

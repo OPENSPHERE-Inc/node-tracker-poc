@@ -129,7 +129,21 @@ describe("NodeTrackerService", () => {
             setTimeout(() => nodeTracker.abortPinging(), 1000);
         }).finally(() => subscription.unsubscribe());
 
-        expect(nodeTracker.isAborting).toBeTruthy();
+        expect(nodeTracker.isAborting).toBeFalsy();
         expect(nodeTracker.numActiveWebSockets).toBe(0);
+    }, 60000);
+
+    it("Single node discovery and pinging", async () => {
+        const pickedNode = nodeTracker.pickOne(10, 1000);
+        assert(pickedNode);
+        const discoveredNodes = await nodeTracker.discovery([ pickedNode.apiStatus.restGatewayUrl ])
+
+        expect(discoveredNodes.length).toBe(1);
+        expect(discoveredNodes.shift()?.apiStatus.restGatewayUrl).toBe(pickedNode.apiStatus.restGatewayUrl);
+
+        const pingedNode = await nodeTracker.ping(pickedNode);
+
+        expect(pingedNode.latest_error).toBeFalsy();
+        expect(pingedNode.latency).toBeTruthy();
     }, 60000);
 });

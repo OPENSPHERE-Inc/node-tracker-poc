@@ -98,32 +98,49 @@ export class NodeTrackerService {
     }
 
     private async challengeWebSocket(url: string) {
+        if (this._aborting) {
+            return false;
+        }
+
+        const id = uuidv4();
         const websocket = new WebSocket(url);
+        this._webSockets.set(id, websocket);
 
         const timeout = setTimeout(() => {
             websocket.close();
         }, this._webSocketTimeout);
 
-        const id = uuidv4();
-        this._webSockets.set(id, websocket);
         return (new Promise<boolean>(async (resolve) => {
             let result = false;
+
             websocket.addEventListener("message",() => {
                 // We should receive `uid` when connecting websocket gateway first.
                 result = true;
                 websocket.close();
             });
+
             websocket.addEventListener("close", () => {
+                this._webSockets.delete(id);
                 resolve(result);
+            });
+
+            websocket.addEventListener("error", () => {
+                this._webSockets.delete(id);
+                resolve(false);
             });
         })).finally(() => {
             clearTimeout(timeout)
-            this._webSockets.delete(id);
         });
     }
 
-    private async ping(node: NodeStatistics) {
+    public async ping(node: NodeStatistics) {
         try {
+            if (this._aborting) {
+                node.latency = undefined;
+                node.latest_error = "Aborted by operation.";
+                return node;
+            }
+
             const repositoryFactory = new RepositoryFactoryHttp(node.apiStatus.restGatewayUrl);
             const networkHttp = repositoryFactory.createNetworkRepository();
             const startAt = moment.now();
@@ -134,9 +151,15 @@ export class NodeTrackerService {
             if (networkType !== this.networkType) {
                 node.latency = undefined;
                 node.latest_error = "The network type is mismatched.";
-                return;
+                return node;
             } else {
                 latency = moment.now() - startAt;
+            }
+
+            if (this._aborting) {
+                node.latency = undefined;
+                node.latest_error = "Aborted by operation.";
+                return node;
             }
 
             // Try to open WebSocket connection
@@ -155,7 +178,7 @@ export class NodeTrackerService {
         return node;
     }
 
-    public async discovery() {
+    public async discovery(nodeUrls?: string[]) {
         this._availableNodes = await axios.get<NodeStatistics[]>(
             this.statsServiceURL,
             { responseType: "json" }
@@ -165,7 +188,8 @@ export class NodeTrackerService {
             for (const node of nodes) {
                 // Only https/wss enabled nodes are allowed
                 try {
-                    if (node.networkIdentifier !== this.networkType ||
+                    if ((nodeUrls?.length && !nodeUrls.includes(node.apiStatus.restGatewayUrl)) ||
+                        node.networkIdentifier !== this.networkType ||
                         !node.apiStatus.isAvailable ||
                         node.apiStatus.nodeStatus.apiNode !== 'up' ||
                         node.apiStatus.nodeStatus.db !== 'up' ||
@@ -186,25 +210,29 @@ export class NodeTrackerService {
     }
 
     public async pingAll() {
-        const nodes = [ ...this._availableNodes ];
-        const nextNode = () => nodes.splice(0, 1).shift();
         this._aborting = false;
+        try {
+            const nodes = [ ...this._availableNodes ];
+            const nextNode = () => nodes.splice(0, 1).shift();
 
-        const workers = new Array<Promise<void>>();
-        let index = 0;
-        for (let i = 0; i < this._maxParallels; i++) {
-            workers.push(new Promise(async (resolve) => {
-                for (let node = nextNode(); node; node = nextNode()) {
-                    if (this._aborting) {
-                        return resolve();
+            const workers = new Array<Promise<void>>();
+            let index = 0;
+            for (let i = 0; i < this._maxParallels; i++) {
+                workers.push(new Promise(async (resolve) => {
+                    for (let node = nextNode(); node; node = nextNode()) {
+                        if (this._aborting) {
+                            return resolve();
+                        }
+                        await this.ping(node);
+                        this._pingObserver.next({ node, index: index++, total: this._availableNodes.length });
                     }
-                    await this.ping(node);
-                    this._pingObserver.next({ node, index: index++, total: this._availableNodes.length });
-                }
-                resolve();
-            }));
+                    resolve();
+                }));
+            }
+            await Promise.allSettled(workers);
+        } finally {
+            this._aborting = false;
         }
-        await Promise.allSettled(workers);
 
         return this._availableNodes;
     }
@@ -212,7 +240,7 @@ export class NodeTrackerService {
     public abortPinging() {
         this._aborting = true;
         // Close all available websockets
-        for (const socket of this._webSockets.values()) {
+        for (const [,socket] of this._webSockets.entries()) {
             socket.close();
         }
     }

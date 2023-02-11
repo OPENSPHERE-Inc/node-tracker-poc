@@ -129,7 +129,7 @@ describe("NodeTrackerService", () => {
             setTimeout(() => nodeTracker.abortPinging(), 1000);
         }).finally(() => subscription.unsubscribe());
 
-        expect(nodeTracker.isAborting).toBeFalsy();
+        expect(nodeTracker.isAborting).toBeTruthy();
         expect(nodeTracker.numActiveWebSockets).toBe(0);
     }, 60000);
 
@@ -139,11 +139,12 @@ describe("NodeTrackerService", () => {
         const discoveredNodes = await nodeTracker.discovery([ pickedNode.apiStatus.restGatewayUrl ])
 
         expect(discoveredNodes.length).toBe(1);
-        expect(discoveredNodes.shift()?.apiStatus.restGatewayUrl).toBe(pickedNode.apiStatus.restGatewayUrl);
+        expect(discoveredNodes[0].apiStatus.restGatewayUrl).toBe(pickedNode.apiStatus.restGatewayUrl);
 
-        const pingedNode = await nodeTracker.ping(pickedNode);
+        const pingedNode = await nodeTracker.checkHealth(pickedNode.apiStatus.restGatewayUrl);
 
-        expect(pingedNode.latest_error).toBeFalsy();
-        expect(pingedNode.latency).toBeTruthy();
+        expect(pingedNode).toBeDefined();
+        expect(pingedNode?.latest_error).toBeFalsy();
+        expect(pingedNode?.latency).toBeTruthy();
     }, 60000);
 });

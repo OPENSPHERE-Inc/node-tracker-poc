@@ -133,14 +133,8 @@ export class NodeTrackerService {
         });
     }
 
-    public async ping(node: NodeStatistics) {
+    private async ping(node: NodeStatistics) {
         try {
-            if (this._aborting) {
-                node.latency = undefined;
-                node.latest_error = "Aborted by operation.";
-                return node;
-            }
-
             const repositoryFactory = new RepositoryFactoryHttp(node.apiStatus.restGatewayUrl);
             const networkHttp = repositoryFactory.createNetworkRepository();
             const startAt = moment.now();
@@ -154,12 +148,6 @@ export class NodeTrackerService {
                 return node;
             } else {
                 latency = moment.now() - startAt;
-            }
-
-            if (this._aborting) {
-                node.latency = undefined;
-                node.latest_error = "Aborted by operation.";
-                return node;
             }
 
             // Try to open WebSocket connection
@@ -211,28 +199,24 @@ export class NodeTrackerService {
 
     public async pingAll() {
         this._aborting = false;
-        try {
-            const nodes = [ ...this._availableNodes ];
-            const nextNode = () => nodes.splice(0, 1).shift();
+        const nodes = [ ...this._availableNodes ];
+        const nextNode = () => nodes.splice(0, 1).shift();
 
-            const workers = new Array<Promise<void>>();
-            let index = 0;
-            for (let i = 0; i < this._maxParallels; i++) {
-                workers.push(new Promise(async (resolve) => {
-                    for (let node = nextNode(); node; node = nextNode()) {
-                        if (this._aborting) {
-                            return resolve();
-                        }
-                        await this.ping(node);
-                        this._pingObserver.next({ node, index: index++, total: this._availableNodes.length });
+        const workers = new Array<Promise<void>>();
+        let index = 0;
+        for (let i = 0; i < this._maxParallels; i++) {
+            workers.push(new Promise(async (resolve) => {
+                for (let node = nextNode(); node; node = nextNode()) {
+                    if (this._aborting) {
+                        return resolve();
                     }
-                    resolve();
-                }));
-            }
-            await Promise.allSettled(workers);
-        } finally {
-            this._aborting = false;
+                    await this.ping(node);
+                    this._pingObserver.next({ node, index: index++, total: this._availableNodes.length });
+                }
+                resolve();
+            }));
         }
+        await Promise.allSettled(workers);
 
         return this._availableNodes;
     }
@@ -278,8 +262,11 @@ export class NodeTrackerService {
     }
 
     public async checkHealth(nodeUrl: string) {
+        this._aborting = false;
         const node = this._availableNodes.find((node) => node.apiStatus.restGatewayUrl === nodeUrl);
-        node && await this.ping(node);
+        if (node) {
+            await this.ping(node);
+        }
         return node?.latency !== undefined && !node.latest_error ? node : undefined;
     }
 

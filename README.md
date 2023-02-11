@@ -117,11 +117,15 @@ const nodeTracker = new NodeTrackerService(statsServiceURL, networkType, options
 #### _discovery メソッド_
 
 ```typescript
-const avaiableNodes: NodeStatistics[] = await nodeTracker.discovery();
+const avaiableNodes: NodeStatistics[] = await nodeTracker.discovery(nodeUrls);
 ```
 
 Symbol Statistics Service からノードリストを取得します。
 有効でないノード（API status が有効でない物、https が有効でない物、WebSocket が有効でない物）は除外されます。
+
+**引数**
+
+- `nodeUrls: string[]` - (Optional) 特定のノードを検索するための、ノードURLのリストを渡せます。
 
 **戻り値**
 
@@ -152,7 +156,7 @@ nodeTracker.abortPinging();
 ```
 
 `pingAll` の実行を中止します。
-実行して程なく `pingAll` メソッドが途中終了して戻ります（その際、WebSocket が全てクローズされるのを待ちます）
+実行して程なく `pingAll()` メソッドが途中終了して戻ります（その際、WebSocket が全てクローズされるのを待ちます）
 
 既に開始しているノードは WebSocket は強制的にクローズされ、中止させられます。
 この時、`NodeStatsitics` の `latency` プロパティは `undefined` になり、
@@ -204,6 +208,10 @@ const healthyNode: NodeStatistics | undefined = await nodeTracker.checkHealth(no
 ```
 
 ノードURLで指定したノードのヘルスチェックを実施します。
+
+結果は戻り値の `latency` プロパティに格納されます（エラーは `latest_error`）
+
+> 予め本メソッドの実行前に `discover()` メソッドでノード一覧を取得しておく必要があります。
 
 **引数**
 
@@ -268,10 +276,11 @@ subscription.unsubscribe();
 const abortingCondition: boolean = nodeTracker.isAborting;
 ```
 
-初期値は `false` で、`abortPinging` が呼ばれると `true` になります。
-`pingAll` が呼ばれると `false` となります。
+初期値は `false` で、`abortPinging()` メソッドが呼ばれると `true` になります。
 
-#### _numActiveWebSockets プロパティ（Readonly)_
+また、`pingAll()`, `healthCheck()` メソッドを呼び出すと一旦 `false` に強制されます。
+
+#### _numActiveWebSockets プロパティ (Readonly)_
 
 ```typescript
 const count: number = nodeTracker.numActiveWebSockets;

@@ -94,6 +94,7 @@ const healthyNodes = nodeTracker.pickMulti(5, 10, 1000);
 ```typescript
 const options: NodeTrackerServiceOptions = {
     cachedNodes: [] as NodeStatistics,
+    cacheTimestamp: 12345678,
     noWebSocketChallenge: false,
     webSocketTimeout: 60000,
     maxParallels: 10,
@@ -106,11 +107,12 @@ const nodeTracker = new NodeTrackerService(statsServiceURL, networkType, options
 
 - `statsServiceURL: string` -　Symbol Statistics Service の URL。Testnet: `https://testnet.symbol.services/nodes`, Mainnet: `https://symbol.services/nodes`
 - `networkType: NetworkType` - Testnet: `152`, Mainnet: `104`
-- `option: NodeTrackerServiceOptions`
-  - `cachedNodes: NodeStatistics[]` - `availableNodes` をローカルキャッシュしていた場合はここで渡す
-  - `noWebSocketChallenge: boolean` - WebSocket 接続のチェックを行わない（その分高速）。デフォルトは `false`
-  - `webSocketTimeout: number` - WebSocket 接続のタイムアウト時間をミリ秒で指定。デフォルトは `60` 秒
-  - `maxParallels: number` - ヘルスチェックの同時実行数。デフォルトは `10`。
+- `option: NodeTrackerServiceOptions` - (Optional)
+  - `cachedNodes: NodeStatistics[]` - (Optional) `availableNodes` をローカルキャッシュしていた場合はここで渡す
+  - `cacheTimestamp: number` - (Optional) ローカルキャッシュ作成日時（Unix時間ミリ秒） 
+  - `noWebSocketChallenge: boolean` - (Optional)WebSocket 接続のチェックを行わない（その分高速）。デフォルトは `false`
+  - `webSocketTimeout: number` - (Optional) WebSocket 接続のタイムアウト時間をミリ秒で指定。デフォルトは `60` 秒
+  - `maxParallels: number` - (Optional) ヘルスチェックの同時実行数。デフォルトは `10`。
     値を大きくするとヘルスチェックがスピードアップしますが、やりすぎると接続エラーが頻発する場合があります。
     試した限りだと `50` 位が限度かもしれません。
 

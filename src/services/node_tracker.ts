@@ -52,6 +52,7 @@ export interface NodeStatistics {
 
 export interface NodeTrackerServiceOptions {
     cachedNodes?: NodeStatistics[];
+    cacheTimestamp?: number;
     noWebSocketChallenge?: boolean;
     webSocketTimeout?: number;
     maxParallels?: number;
@@ -60,6 +61,7 @@ export interface NodeTrackerServiceOptions {
 export class NodeTrackerService {
 
     private _availableNodes: NodeStatistics[];
+    private _discoveredAt?: number;
     private readonly _pingObserver = new Subject<{ node: NodeStatistics, index: number, total: number }>();
     private readonly _noWebSocketChallenge: boolean;
     private readonly _webSocketTimeout: number;
@@ -68,11 +70,12 @@ export class NodeTrackerService {
     private _webSockets = new Map<string, WebSocket>();
 
     public constructor(
-        private statsServiceURL: string,
-        private networkType: NetworkType,
+        private _statsServiceURL: string,
+        private _networkType: NetworkType,
         options?: NodeTrackerServiceOptions,
     ) {
         this._availableNodes = options?.cachedNodes || [];
+        this._discoveredAt = options?.cacheTimestamp;
         this._noWebSocketChallenge = !!options?.noWebSocketChallenge;
         this._webSocketTimeout = options?.webSocketTimeout || 60000;
         this._maxParallels = options?.maxParallels || 10;
@@ -83,6 +86,10 @@ export class NodeTrackerService {
 
     public get availableNodes() {
         return this._availableNodes;
+    }
+
+    public get discoveredAt() {
+        return this._discoveredAt;
     }
 
     public get pingObserver() {
@@ -139,16 +146,9 @@ export class NodeTrackerService {
             const networkHttp = repositoryFactory.createNetworkRepository();
             const startAt = moment.now();
 
-            // Try to access REST Gateway and measure latency
-            const networkType = await firstValueFrom(networkHttp.getNetworkType());
-            let latency: number | undefined;
-            if (networkType !== this.networkType) {
-                node.latency = undefined;
-                node.latest_error = "The network type is mismatched.";
-                return node;
-            } else {
-                latency = moment.now() - startAt;
-            }
+            // Try to network properties
+            await firstValueFrom(networkHttp.getNetworkProperties());
+            const latency = moment.now() - startAt;
 
             // Try to open WebSocket connection
             if (!this._noWebSocketChallenge && !await this.challengeWebSocket(node.apiStatus.webSocket.url)) {
@@ -168,7 +168,7 @@ export class NodeTrackerService {
 
     public async discovery(nodeUrls?: string[]) {
         this._availableNodes = await axios.get<NodeStatistics[]>(
-            this.statsServiceURL,
+            this._statsServiceURL,
             { responseType: "json" }
         ).then((res) => {
             const result = new Array<NodeStatistics>();
@@ -177,7 +177,7 @@ export class NodeTrackerService {
                 // Only https/wss enabled nodes are allowed
                 try {
                     if ((nodeUrls?.length && !nodeUrls.includes(node.apiStatus.restGatewayUrl)) ||
-                        node.networkIdentifier !== this.networkType ||
+                        node.networkIdentifier !== this._networkType ||
                         !node.apiStatus.isAvailable ||
                         node.apiStatus.nodeStatus.apiNode !== 'up' ||
                         node.apiStatus.nodeStatus.db !== 'up' ||
@@ -194,6 +194,7 @@ export class NodeTrackerService {
             return result;
         });
 
+        this._discoveredAt = moment.now();
         return this._availableNodes;
     }
 
@@ -233,7 +234,9 @@ export class NodeTrackerService {
         const safeLatency = (latency?: number) => latency || Number.MAX_SAFE_INTEGER;
         return this._availableNodes
             .filter((node) =>
-                !node.latest_error && safeLatency(node.latency) <= maxLatency)
+                node.networkIdentifier === this._networkType &&
+                !node.latest_error &&
+                safeLatency(node.latency) <= maxLatency)
             .sort((n1, n2) => safeLatency(n1.latency) - safeLatency(n2.latency));
     }
 
@@ -261,13 +264,19 @@ export class NodeTrackerService {
         return result;
     }
 
-    public async checkHealth(nodeUrl: string) {
+    public async checkHealth(nodeUrl: string, maxLatency = Number.MAX_SAFE_INTEGER) {
         this._aborting = false;
-        const node = this._availableNodes.find((node) => node.apiStatus.restGatewayUrl === nodeUrl);
+        const node = this._availableNodes.find(
+            (node) =>
+                node.networkIdentifier === this._networkType &&
+                node.apiStatus.restGatewayUrl === nodeUrl
+        );
         if (node) {
             await this.ping(node);
         }
-        return node?.latency !== undefined && !node.latest_error ? node : undefined;
+        return node?.latency !== undefined && !node.latest_error && node.latency <= maxLatency
+            ? node
+            : undefined;
     }
 
 }

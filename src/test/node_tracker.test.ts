@@ -21,16 +21,17 @@ describe("NodeTrackerService", () => {
             { maxParallels: 5 }
         );
 
-        assert(process.env.ACCOUNT1_PRIVATE_KEY);
-        assert(process.env.ACCOUNT2_PRIVATE_KEY);
-        account1 = Account.createFromPrivateKey(process.env.ACCOUNT1_PRIVATE_KEY, Number(process.env.NETWORK_TYPE));
-        account2 = Account.createFromPrivateKey(process.env.ACCOUNT2_PRIVATE_KEY, Number(process.env.NETWORK_TYPE));
+        assert(process.env.SIGNER1_PRIVATE_KEY);
+        assert(process.env.PAYER_PRIVATE_KEY);
+        account1 = Account.createFromPrivateKey(process.env.SIGNER1_PRIVATE_KEY, Number(process.env.NETWORK_TYPE));
+        account2 = Account.createFromPrivateKey(process.env.PAYER_PRIVATE_KEY, Number(process.env.NETWORK_TYPE));
     });
 
     it("Discover nodes", async () => {
         await nodeTracker.discovery();
 
         expect(nodeTracker.availableNodes.length).toBeTruthy();
+        expect(nodeTracker.discoveredAt).toBeTruthy();
 
         console.debug(`Available nodes = ${nodeTracker.availableNodes.length}`);
     }, 60000);
@@ -141,7 +142,7 @@ describe("NodeTrackerService", () => {
         expect(discoveredNodes.length).toBe(1);
         expect(discoveredNodes[0].apiStatus.restGatewayUrl).toBe(pickedNode.apiStatus.restGatewayUrl);
 
-        const pingedNode = await nodeTracker.checkHealth(pickedNode.apiStatus.restGatewayUrl);
+        const pingedNode = await nodeTracker.checkHealth(pickedNode.apiStatus.restGatewayUrl, 1500);
 
         expect(pingedNode).toBeDefined();
         expect(pingedNode?.latest_error).toBeFalsy();

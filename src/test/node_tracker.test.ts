@@ -21,10 +21,10 @@ describe("NodeTrackerService", () => {
             { maxParallels: 5 }
         );
 
-        assert(process.env.SIGNER1_PRIVATE_KEY);
-        assert(process.env.PAYER_PRIVATE_KEY);
-        account1 = Account.createFromPrivateKey(process.env.SIGNER1_PRIVATE_KEY, Number(process.env.NETWORK_TYPE));
-        account2 = Account.createFromPrivateKey(process.env.PAYER_PRIVATE_KEY, Number(process.env.NETWORK_TYPE));
+        assert(process.env.ACCOUNT1_PRIVATE_KEY);
+        assert(process.env.ACCOUNT2_PRIVATE_KEY);
+        account1 = Account.createFromPrivateKey(process.env.ACCOUNT1_PRIVATE_KEY, Number(process.env.NETWORK_TYPE));
+        account2 = Account.createFromPrivateKey(process.env.ACCOUNT2_PRIVATE_KEY, Number(process.env.NETWORK_TYPE));
     });
 
     it("Discover nodes", async () => {

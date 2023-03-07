@@ -74,11 +74,11 @@ export class NodeTrackerService {
         private _networkType: NetworkType,
         options?: NodeTrackerServiceOptions,
     ) {
-        this._availableNodes = options?.cachedNodes || [];
-        this._discoveredAt = options?.cacheTimestamp;
         this._noWebSocketChallenge = !!options?.noWebSocketChallenge;
         this._webSocketTimeout = options?.webSocketTimeout || 60000;
         this._maxParallels = options?.maxParallels || 10;
+        this._availableNodes = this.validateNodes(options?.cachedNodes || []);
+        this._discoveredAt = options?.cacheTimestamp;
 
         assert(this._webSocketTimeout);
         assert(this._maxParallels);
@@ -166,33 +166,36 @@ export class NodeTrackerService {
         return node;
     }
 
+    private validateNodes(unsafeNodes: NodeStatistics[]) {
+        const safeNodes = new Array<NodeStatistics>();
+        for (const node of unsafeNodes) {
+            // Only https/wss enabled nodes are allowed
+            try {
+                if (node.networkIdentifier !== this._networkType ||
+                    !node.apiStatus.isAvailable ||
+                    node.apiStatus.nodeStatus.apiNode !== 'up' ||
+                    node.apiStatus.nodeStatus.db !== 'up' ||
+                    !node.apiStatus.isHttpsEnabled ||
+                    !node.apiStatus.webSocket.isAvailable ||
+                    !node.apiStatus.webSocket.wss
+                ) {
+                    // Skip unavailable node
+                    continue;
+                }
+                safeNodes.push(node);
+            } catch (e) {}
+        }
+        return safeNodes;
+    }
+
     public async discovery(nodeUrls?: string[]) {
         this._availableNodes = await axios.get<NodeStatistics[]>(
             this._statsServiceURL,
             { responseType: "json" }
-        ).then((res) => {
-            const result = new Array<NodeStatistics>();
-            const nodes = res.data;
-            for (const node of nodes) {
-                // Only https/wss enabled nodes are allowed
-                try {
-                    if ((nodeUrls?.length && !nodeUrls.includes(node.apiStatus.restGatewayUrl)) ||
-                        node.networkIdentifier !== this._networkType ||
-                        !node.apiStatus.isAvailable ||
-                        node.apiStatus.nodeStatus.apiNode !== 'up' ||
-                        node.apiStatus.nodeStatus.db !== 'up' ||
-                        !node.apiStatus.isHttpsEnabled ||
-                        !node.apiStatus.webSocket.isAvailable ||
-                        !node.apiStatus.webSocket.wss
-                    ) {
-                        // Skip unavailable node
-                        continue;
-                    }
-                    result.push(node);
-                } catch (e) {}
-            }
-            return result;
-        });
+        ).then((res) =>
+            this.validateNodes(res.data)
+                .filter((node) => !nodeUrls?.length || nodeUrls.includes(node.apiStatus.restGatewayUrl))
+        );
 
         this._discoveredAt = moment.now();
         return this._availableNodes;
